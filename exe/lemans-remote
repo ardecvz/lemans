@@ -42,7 +42,7 @@
 #     exe/lemans-remote logs RUN_ID [--tail N]
 #     exe/lemans-remote pull-runs [RUN_ID ...] [--match SUBSTR] [--all] [--dry-run]
 #     exe/lemans-remote drop-orphans [--min-age 10m]
-#     exe/lemans-remote clobber RUN_ID ... | --all
+#     exe/lemans-remote clobber RUN_ID ... | --all | --stopped
 #     exe/lemans-remote snapshots
 #     exe/lemans-remote deprovision [--name SNAPSHOT]
 #
@@ -1183,11 +1183,13 @@ module LemansRemote # :nodoc: all
       raise Thor::Error, "lemans-remote: #{e.message}"
     end
 
-    desc "clobber [RUN_IDS...]", "Delete archived runs from the vault (--all wipes the whole volume)"
+    desc "clobber [RUN_IDS...]", "Delete archived runs from the vault (--all wipes the whole volume, --stopped drops stopped sandboxes)"
     option :all, type: :boolean, default: false, desc: "Delete every archived run and the volume itself"
+    option :stopped, type: :boolean, default: false, desc: "Delete stopped run sandboxes only (the vault archives stay)"
     option :force, type: :boolean, default: false, aliases: "-f", desc: "Skip the confirmation"
     def clobber(*run_ids)
-      raise Thor::Error, "lemans-remote: pass run id(s) or --all" if run_ids.empty? && !options[:all]
+      raise Thor::Error, "lemans-remote: pass run id(s), --all, or --stopped" if run_ids.empty? && !options[:all] && !options[:stopped]
+      return clobber_stopped if options[:stopped]
 
       live = Fleet.live
       if options[:all]
@@ -1456,6 +1458,22 @@ module LemansRemote # :nodoc: all
 
       vault = VaultClient.new(snapshot: provisioner.name)
       vault.with_helper { |sandbox| block.call(vault, sandbox) }
+    end
+
+    def clobber_stopped
+      stopped = Fleet.rows.select { it.state == DaytonaApiClient::SandboxState::STOPPED }
+      if stopped.empty?
+        say_status :clean, "no stopped run sandboxes", :green
+        return
+      end
+
+      stopped.each { say_status :stopped, "#{it.run_id} (#{it.sandbox.id}, #{it.status})", :yellow }
+      return unless options[:force] || yes?("Delete #{stopped.size} stopped sandbox(es)? [y/N]")
+
+      stopped.each do |row|
+        safe_delete_sandbox(row.sandbox)
+        say_status :clobbered, row.run_id, :green
+      end
     end
 
     def safe_delete_sandbox(sandbox)
