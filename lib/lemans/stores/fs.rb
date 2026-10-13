@@ -11,11 +11,12 @@ module Lemans
     class FS < Store
       FILENAME = "result.json"
 
-      private attr_reader :root, :filterer
+      private attr_reader :root, :read_roots, :filterer
 
-      def initialize(root, filterer: nil)
+      def initialize(root, *read_roots, filterer: nil)
         super()
         @root = Pathname(root)
+        @read_roots = [ @root ] + read_roots.map { Pathname(it) }
         @filterer = filterer
       end
 
@@ -26,7 +27,7 @@ module Lemans
       end
 
       def fetch
-        root.glob("**/#{FILENAME}").filter_map { to_record(it) }
+        read_roots.flat_map { it.glob("**/#{FILENAME}") }.filter_map { to_record(it) }
       end
 
       # The file system keeps no index, so filtering happens in memory.
@@ -43,7 +44,7 @@ module Lemans
       RESULT_ID = /\A(?<task>.+)__[A-Za-z0-9]{7}\z/
 
       def unreadable
-        root.glob("**/#{FILENAME}").filter_map do |path|
+        read_roots.flat_map { it.glob("**/#{FILENAME}") }.filter_map do |path|
           next if to_record(path)
 
           id = path.dirname.basename.to_s

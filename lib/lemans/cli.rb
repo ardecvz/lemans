@@ -197,7 +197,7 @@ module Lemans
     end
 
     desc "report [RUNS_DIR]", "Summarize run results as a table or CSV"
-    option :runs_dir, default: "runs", desc: "Directory holding run directories (or pass it as RUNS_DIR)"
+    option :runs_dir, default: [], desc: "Directories holding run results (or pass it as RUNS_DIR)", repeatable: true
     option :tag, desc: "Only runs whose result carries this tag", repeatable: true
     option :task, desc: "Only these tasks' runs", repeatable: true
     option :metadata, banner: "KEY:VALUE", desc: "Only runs whose task metadata has this value (every pair must match)",
@@ -210,8 +210,10 @@ module Lemans
     option :skip_invalid, type: :boolean, default: false, desc: "Leave out trials with an invalid outcome"
     option :show_features, type: :boolean, default: false, desc: "Add a feat:<name> column per tracked feature"
     option :hide_columns, banner: "COLUMNS", desc: "Leave dash-joined columns out of the table, e.g. steps-tokens-trial"
-    def report(runs_dir = options[:runs_dir])
-      store = Stores::FS.new(runs_dir)
+    def report(runs_dir = nil)
+      runs_dir = ([ runs_dir ] + options[:runs_dir]).compact
+      runs_dir = [ "runs" ] if runs_dir.empty?
+      store = Stores::FS.new(*runs_dir)
       results = Report.load(store, tags: options[:tag], names: options[:task],
                                    metadata: Report.metadata_filter(options[:metadata]),
                                    skip_invalid: options[:skip_invalid], show_features: options[:show_features],
