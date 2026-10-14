@@ -169,7 +169,9 @@ class EportLemansTest < Minitest::Test
     reporter.record(passing("VerifierTest", "test_feature", file: "/tests/verification_test.rb"))
 
     reporter.stub(:tampered?, true) do
-      assert_raises(SystemExit) { reporter.report }
+      _, err = capture_io { assert_raises(SystemExit) { reporter.report } }
+
+      assert_includes err, "no result can be trusted"
     end
   end
 end
