@@ -54,6 +54,11 @@ class AllowlistProxyTest < Minitest::Test
     assert_equal "HTTP/1.1 403 Forbidden\r\n\r\n", ask("GET http://example.com/ HTTP/1.1\r\n\r\n").read
   end
 
+  def test_wildcard
+    assert AllowlistProxy.new(%w[*]).send(:allowed?, "example.com")
+    refute AllowlistProxy.new(%w[localhost]).send(:allowed?, "example.com")
+  end
+
   private
 
   def listening?

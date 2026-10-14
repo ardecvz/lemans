@@ -6,6 +6,7 @@ lemans is a harness for benchmarking coding agents, the Ruby way:
 - **Conventional**, aka _boilerplate-free_: an instruction, a Docker environment, and a test script — that's all you need to describe an eval
 - **Trustworthy**: a grade can't be gamed by the agent, an infrastructure failure can't masquerade as a model failure, and every result carries enough digests to prove what it actually measured
 - Powered by **miniswen**, a Ruby version of mini-swe-agent (powered by [RubyLLM](https://rubyllm.com/), so it works with any LLM) and [Daytona](https://www.daytona.io) sandboxes.
+- **Extensible**: load a custom agent or a sandboxing backend on-the-fly defined in a Ruby file or provided by a gem.
 
 > [!TIP]
 > Check [Rails AI Evals](https://github.com/rails/ai-evals) for a full-featured example.
@@ -263,12 +264,21 @@ gpt-5.6-luna  ar-archive-book-access  2/2    2m 23s  $0.0132  12.5   156905
 6 trials: 6 scored, 0 invalid, 6 solved (100%) · $0.0801 · pass@2 3/3 tasks (100%)
 ```
 
-### Bring your own agent
+### 6. Extensions
 
-Any agent that implements the `Lemans::Agent` contract can be measured. It sees its profile (the `agent:` section of `bench.yml`), the task, and the environment, and works through `environment.exec`, `upload`, and `download`. `run` returns an `Agent::Response` with an outcome and usage; `install` runs while the setup network is still open. Define it in a file, register it under a name, and load the file with `--require`:
+You can bring **custom agents and backends** to lemans. For that, you should:
+
+- Write an agent or a backend implementation in a Ruby file/gem
+- Load it using the `--require` / `-r` option specified **before the command**:
+
+```sh
+lemans -r ./my-agent.rb run --agent my-agent ...
+```
+
+- **IMPORTANT:** The extension must register itself in the corresponding registry and follow the leman's interface:
 
 ```ruby
-# my_agent.rb
+# my-agent.rb
 class MyAgent < Lemans::Agent
   NAME = "my-agent"
 
@@ -280,30 +290,24 @@ class MyAgent < Lemans::Agent
   def run(task, environment)
     finished = environment.exec("cd #{task.environment.workdir} && my-agent --model #{model}", timeout:)
     outcome = finished.exit_code == 124 ? :agent_timeout : :completed
+
+    # The returned object is a Lemans::Response. 
+    # IMPORTANT: `usage` is required for correct work
     Response.new(outcome: Lemans::Result::Outcome.new(outcome), usage: Lemans::Result::Usage.zero)
   end
 end
 
 Lemans::Agents.register(MyAgent::NAME, MyAgent)
+
+# my-backend.rb
+
+TODO: miminal backend example
 ```
 
-```bash
-lemans run --bench my-bench --require my_agent.rb --agent my-agent
-```
+See [examples](./examples) for real-world extensions:
 
-Report what the run cost in `usage` (`cost_usd: nil` when it is unknown), and raise `Lemans::InfrastructureError` or return a `Response` with an `error` when the agent itself failed, so the trial counts as invalid rather than as a zero.
-
-### Bring your own backend
-
-A sandbox backend works the same way. Subclass `Lemans::Environment`, implement its contract (`start`, `exec`, `upload`, `download`, and the rest), and register it with `Lemans::Environments.register`. The constructor receives `image:`, `resources:`, `network:`, `build_timeout:`, `ttl:`, and `labels:`. Select it with `--backend` or `environment.backend` in `bench.yml`:
-
-```bash
-lemans run --bench my-bench -r my_backend.rb --backend my-backend
-```
-
-A registered name overrides a built-in one: register `"docker"` to replace the Docker backend.
-
-`--require` (`-r`) is a global option. Every command accepts it, before or after the command name (`lemans -r plugin.rb restart RUN`). Repeat it to load several files.
+- [Apple Container backed](./examples/apple-container.rb)
+- [Claude Code agent](./examples/claude-code.rb)
 
 ## CLI
 

@@ -5,6 +5,7 @@ require "uri"
 
 # An HTTP proxy that lets clients reach the allowed hosts only:
 # CONNECT tunnels for https, absolute-form requests for plain http.
+# A "*" host lets every host through.
 class AllowlistProxy
   HOP_HEADERS = /\A(?:connection|keep-alive|proxy-[\w-]+):/i
 
@@ -55,7 +56,7 @@ class AllowlistProxy
     pump(client, upstream)
   end
 
-  def allowed?(host) = @hosts.include?(host.to_s.downcase)
+  def allowed?(host) = @hosts.include?("*") || @hosts.include?(host.to_s.downcase)
 
   def deny(client) = client.write("HTTP/1.1 403 Forbidden\r\n\r\n")
 

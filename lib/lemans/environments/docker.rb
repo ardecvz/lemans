@@ -16,6 +16,10 @@ module Lemans
 
       attr_reader :container
 
+      def self.proxy_image
+        @proxy_image ||= Config::ImageSpec.dockerfile(Pathname(__dir__).join("docker/proxy/Dockerfile"), slug: "proxy")
+      end
+
       def initialize(image:, resources:, network:, env: {}, labels: {}, logger: nil, build_timeout: nil, ttl: nil)
         super(image:, resources:, network:, env:, labels:, ttl:,
               build_timeout: build_timeout || DEFAULT_BUILD_TIMEOUT)
@@ -108,7 +112,7 @@ module Lemans
       # The task container sits on an internal network with no route out; the
       # proxy is on it and on bridge, so the hosts it allows are the only way out.
       def start_proxy!(hosts)
-        image = Config::ImageSpec.dockerfile(Pathname(__dir__).join("docker/proxy/Dockerfile"), slug: "proxy")
+        image = self.class.proxy_image
         build_image!(image)
         create_internal_network!
         docker!("run", "--detach", "--name", proxy_name, "--network", internal_network,

@@ -7,7 +7,7 @@ The proxy supports two request types:
 - `CONNECT host:port` tunnels (https).
 - Absolute-form requests (`GET http://host/path`) for plain http.
 
-The proxy refuses a host that is not on the list with `403 Forbidden`. Host names must match exactly. IP ranges are not supported.
+The proxy refuses a host that is not on the list with `403 Forbidden`. Host names must match exactly. IP ranges are not supported. The host `*` lets every host through.
 
 ## How the Docker backend uses it
 

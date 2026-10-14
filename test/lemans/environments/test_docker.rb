@@ -88,6 +88,7 @@ class DockerEnvironmentTest < Minitest::Test
 
     proxy_run, container_run = calls.select { it[:argv][1] == "run" }.map { it[:argv] }
     assert_equal "rubygems.org", proxy_run.last
+    assert_includes proxy_run, Lemans::Environments::Docker.proxy_image.name
     assert_includes container_run.each_cons(2).to_a, [ "--network", "#{environment.container}-net" ]
 
     error = assert_raises(Lemans::ConfigError) { environment_for(network: policy("allowlist", %w[10.0.0.0/8 rubygems.org])) }
