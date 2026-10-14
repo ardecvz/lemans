@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.5.2] - 2026-10-14
+
 - `lemans --require/-r [command]`: load agent, backend plugins (`lemans -r plugin.rb restart RUN`)
 - `lemant report` normalizes metrics (credit, cost, steps, and tokens) within each task individually before combining them in the final report.
 - `lemans report`: add credit to summary lines.
