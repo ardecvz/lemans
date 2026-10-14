@@ -200,6 +200,7 @@ module Lemans
     option :runs_dir, default: [], desc: "Directories holding run results (or pass it as RUNS_DIR)", repeatable: true
     option :tag, desc: "Only runs whose result carries this tag", repeatable: true
     option :task, desc: "Only these tasks' runs", repeatable: true
+    option :model, desc: "Only these models' runs (full id or the short name the table shows)", repeatable: true
     option :metadata, banner: "KEY:VALUE", desc: "Only runs whose task metadata has this value (every pair must match)",
                       repeatable: true
     option :format, default: "table", enum: %w[table csv], desc: "Output format"
@@ -214,7 +215,7 @@ module Lemans
       runs_dir = ([ runs_dir ] + options[:runs_dir]).compact
       runs_dir = [ "runs" ] if runs_dir.empty?
       store = Stores::FS.new(*runs_dir)
-      results = Report.load(store, tags: options[:tag], names: options[:task],
+      results = Report.load(store, tags: options[:tag], names: options[:task], models: options[:model],
                                    metadata: Report.metadata_filter(options[:metadata]),
                                    skip_invalid: options[:skip_invalid], show_features: options[:show_features],
                                    hide_columns: options[:hide_columns])

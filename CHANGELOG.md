@@ -2,6 +2,7 @@
 
 - `lemant report` normalizes metrics (credit, cost, steps, and tokens) within each task individually before combining them in the final report.
 - `lemans report`: add credit to summary lines.
+- `lemans report --model x [--model y]` filters runs by model (full id or short name).
 
 ## [1.5.1] - 2026-10-06
 

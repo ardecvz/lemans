@@ -16,8 +16,10 @@ module Lemans
       attr_reader :rows, :unreadable, :show_features, :hide_columns
 
       class << self
-        def load(store, tags: nil, names: nil, metadata: nil, skip_invalid: false, **)
+        # Models match by full id or by the short name the table shows
+        def load(store, tags: nil, names: nil, models: nil, metadata: nil, skip_invalid: false, **)
           rows = store.query(task: names, tags:, metadata:).map { row_from(it) }
+          rows = rows.select { models.intersect?([ it[:model], short_model(it[:model]) ]) } if models
           rows = rows.select { it[:scored] } if skip_invalid
           new(rows.sort_by { [ it[:task].to_s, it[:started_at].to_s, it[:trial].to_s ] },
               unreadable: store.unreadable.size, **)

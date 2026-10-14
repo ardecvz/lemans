@@ -95,6 +95,15 @@ class CLIReportTest < Minitest::Test
 
       assert_equal(%w[hello-world__aaa], by_metadata.rows.map { it[:trial] })
       assert_equal(%w[hello-world__aaa other-task__ccc], by_app.rows.map { it[:trial] })
+
+      store_result(store, trial: "hello-world__ddd", model: "openrouter/z-ai/glm-5.2")
+
+      assert_equal(%w[hello-world__ddd],
+                   Lemans::CLI::Report.load(store, models: %w[glm-5.2]).rows.map { it[:trial] })
+      assert_equal(%w[hello-world__ddd],
+                   Lemans::CLI::Report.load(store, models: %w[openrouter/z-ai/glm-5.2]).rows.map { it[:trial] })
+      assert_equal 4, Lemans::CLI::Report.load(store, models: %w[glm-5.2 deepseek-v4-flash]).rows.size
+      assert_predicate Lemans::CLI::Report.load(store, models: %w[z-ai/glm-5.2]), :empty?
     end
   end
 
