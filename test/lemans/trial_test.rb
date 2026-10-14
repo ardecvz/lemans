@@ -259,7 +259,8 @@ class TrialTest < Minitest::Test
     end.new
     agent = Lemans::Agents::Nop.new(profile: load_config.agent)
     agent.define_singleton_method(:run) do |_task, _environment, **|
-      Lemans::Agent::Response.new(error: "the model went away", trajectory:, raw_result: '{"status":"error"}')
+      Lemans::Agent::Response.new(error: "the model went away", trajectory:, raw_result: '{"status":"error"}',
+                                  artifacts: { "session.jsonl" => "{}\n" })
     end
 
     store = TestStore.new
@@ -271,6 +272,7 @@ class TrialTest < Minitest::Test
     assert_includes store.files.keys, "trajectory.json"
     assert_includes store.files.keys, "agent.patch"
     assert_equal '{"status":"error"}', store.files["agent.result.json"]
+    assert_equal "{}\n", store.files["session.jsonl"]
     # A failed agent phase grades nothing.
     assert_nil store.files["verifier.log"]
   end

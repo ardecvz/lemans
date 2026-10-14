@@ -291,7 +291,7 @@ class MyAgent < Lemans::Agent
     finished = environment.exec("cd #{task.environment.workdir} && my-agent --model #{model}", timeout:)
     outcome = finished.exit_code == 124 ? :agent_timeout : :completed
 
-    # The returned object is a Lemans::Response. 
+    # The returned object is a Lemans::Agent::Response.
     # IMPORTANT: `usage` is required for correct work
     Response.new(outcome: Lemans::Result::Outcome.new(outcome), usage: Lemans::Result::Usage.zero)
   end
@@ -300,13 +300,45 @@ end
 Lemans::Agents.register(MyAgent::NAME, MyAgent)
 
 # my-backend.rb
+class MyBackend < Lemans::Environment
+  NAME = "my-backend"
 
-TODO: miminal backend example
+  # Called with image:, resources:, network:, labels:, build_timeout:, and ttl: (see Lemans::Environment)
+  def start
+    @sandbox = MyCloud.create(image: image.name, cpus: resources.cpus, memory: resources.memory)
+    switch_network_policy!(network)
+    self
+  end
+
+  def exec(command, timeout: nil, env: {})
+    run = @sandbox.run(command, timeout: timeout || DEFAULT_TIMEOUT, env:)
+    ExecResult.new(command:, exit_code: run.exit_code, output: run.output, duration: run.duration)
+  end
+
+  def upload(local_path, remote_path) = @sandbox.put(local_path, remote_path)
+
+  def download(remote_path, local_path) = @sandbox.get(remote_path, local_path)
+
+  # Phases narrow the network: setup, then the agent's policy, then none for the verifier.
+  # IMPORTANT: raise if the policy cannot be enforced
+  def switch_network_policy!(policy)
+    @sandbox.set_network(policy.mode, hosts: policy.hosts)
+    @network = policy
+  end
+
+  def stop = @sandbox&.destroy
+end
+
+Lemans::Environments.register(MyBackend::NAME, MyBackend)
+```
+
+```sh
+lemans -r ./my-backend.rb run --backend my-backend ...
 ```
 
 See [examples](./examples) for real-world extensions:
 
-- [Apple Container backed](./examples/apple-container.rb)
+- [Apple Container backend](./examples/apple-container.rb)
 - [Claude Code agent](./examples/claude-code.rb)
 
 ## CLI

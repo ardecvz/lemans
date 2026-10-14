@@ -102,6 +102,7 @@ module Lemans
           # Whatever the agent brought back is evidence, a failed run's included
           save_trajectory!(response.trajectory)
           store&.save_artifact(result, response.raw_result, path: with_step_index("agent.result.json")) if response.raw_result
+          response.artifacts.each { |path, contents| store&.save_artifact(result, contents, path: with_step_index(path)) }
 
           if response.error?
             result.failed!(:agent_error, response.error)

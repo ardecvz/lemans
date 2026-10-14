@@ -16,7 +16,7 @@ Each layer may look down, never up:
 
 Boundary rules:
 
-- Never use `Store` or the `Result` record below Trial (and its components). Agents hand evidence back via `Agent::Response` (outcome, usage, trajectory, error, raw result); the Trial persists it. Result's value parts (`Outcome`, `Usage`, `CostSource`) are the shared vocabulary any layer may construct.
+- Never use `Store` or the `Result` record below Trial (and its components). Agents hand evidence back via `Agent::Response` (outcome, usage, trajectory, error, raw result, artifacts); the Trial persists it. Result's value parts (`Outcome`, `Usage`, `CostSource`) are the shared vocabulary any layer may construct.
 - An agent sees exactly three things: its `profile` (the `Config::Agent` section, at construction), the `task`, and the `environment`. Never the whole Config, never paths.
 - Environments know no lemans domain: they receive resolved config values (`ImageSpec`, `Resources`, `NetworkPolicy`, opaque labels) and expose the narrow exec contract. No Task, Config, Result, or Store.
 - Phase machinery (Trial and its components) parameterizes from `task.<section>` (the per-task projection), never from global config sections. Run-level knobs (agent profile, backend, models, attempts, digest, revision) are read from `config` at Runner/Trial level only.
