@@ -63,7 +63,7 @@ class CLIReportTest < Minitest::Test
       assert_equal "-", invalid[rows.first.index("reward")]
       assert_equal "-", invalid[rows.first.index("credit")]
       assert_equal "-", invalid[rows.first.index("tokens")]
-      assert_includes report.summary_lines.join("\n"), "3 trials: 2 scored, 1 invalid, 1 solved (50%)"
+      assert_includes report.summary_lines.join("\n"), "3 trials: 2 scored, 1 invalid, 1 solved (50%) · credit 0.70"
     end
   end
 
@@ -76,6 +76,7 @@ class CLIReportTest < Minitest::Test
 
       refute_includes report.to_rows.first, "credit"
       refute_includes Lemans::CLI::Report::Aggregate.new(report, keys: %i[task]).to_rows.first, "credit"
+      refute_includes report.summary_lines.join, "credit"
       assert_includes report.to_csv.lines.first, "credit"
     end
   end
@@ -115,16 +116,18 @@ class CLIReportTest < Minitest::Test
       store = Lemans::Stores::FS.new(runs_dir)
       store_result(store, trial: "a__1", model: "openrouter/openai/gpt-5.6-luna", reward: 1.0)
       store_result(store, trial: "a__2", model: "openrouter/openai/gpt-5.6-luna", reward: 0.0)
-      store_result(store, trial: "a__3", model: "openrouter/z-ai/glm-5.2", reward: 1.0)
+      store_result(store, trial: "a__3", model: "openrouter/z-ai/glm-5.2", reward: 0.0, credit: 0.6)
+      store_result(store, trial: "b__4", task: "b", model: "openrouter/z-ai/glm-5.2", reward: 1.0)
 
       report = Lemans::CLI::Report.load(store)
       lines = report.summary_lines
 
       assert_equal 3, lines.size
-      assert(lines[0..1].any? { it.start_with?("gpt-5.6-luna") && it.include?("1 solved (50%)") })
-      assert(lines[0..1].any? { it.start_with?("glm-5.2") && it.include?("1 solved (100%)") })
+      assert(lines[0..1].any? { it.start_with?("gpt-5.6-luna") && it.include?("1 solved (50%) · credit 0.50") })
+      assert(lines[0..1].any? { it.start_with?("glm-5.2") && it.include?("1 solved (50%) · credit 0.80") })
       assert lines.last.start_with?("total")
-      assert_includes lines.last, "2 solved (67%)"
+      # Each task weighs the same: a averages 0.53, b 1.0.
+      assert_includes lines.last, "2 solved (50%) · credit 0.77"
       # The table shows the short name; the CSV keeps the full provenance.
       assert_includes report.to_rows.flatten, "gpt-5.6-luna"
       assert_includes report.to_csv, "openrouter/openai/gpt-5.6-luna"

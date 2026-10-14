@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 - `lemant report` normalizes metrics (credit, cost, steps, and tokens) within each task individually before combining them in the final report.
+- `lemans report`: add credit to summary lines.
 
 ## [1.5.1] - 2026-10-06
 

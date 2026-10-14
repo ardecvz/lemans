@@ -292,7 +292,19 @@ module Lemans
         totals = self.class.tally(group).merge(cost_usd: group.sum { it[:cost_usd].to_f })
         rank = totals[:scored].positive? ? " (#{(100.0 * totals[:solved] / totals[:scored]).round}%)" : ""
         "#{totals[:total]} trials: #{totals[:scored]} scored, #{totals[:invalid]} invalid, " \
-          "#{totals[:solved]} solved#{rank} · $#{format("%.4f", totals[:cost_usd])}#{pass_at_k(group)}"
+          "#{totals[:solved]} solved#{rank}#{mean_credit(group)} · $#{format("%.4f", totals[:cost_usd])}" \
+          "#{pass_at_k(group)}"
+      end
+
+      # Each task weighs the same, as in the aggregate view
+      def mean_credit(group)
+        return "" unless fractional?
+
+        means = group.group_by { it[:task] }.values.filter_map do |rows|
+          credits = rows.filter_map { it[:credit] }
+          credits.sum(0.0) / credits.size unless credits.empty?
+        end
+        means.empty? ? "" : " · credit #{format("%.2f", means.sum / means.size)}"
       end
 
       def pass_at_k(group)
