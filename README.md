@@ -366,6 +366,13 @@ $ miniswen --model 'openrouter/openai/gpt-5.6-luna' --prompt 'Write hello-world 
 
 Currently, it's a one-shot agent that doesn't ask any questions. It's mostly useful for playing with eval ideas before encoding them as lemans tasks.
 
+## More tools: lemans-remote and lemans-viewer
+
+The gem also ships two convenient (and 100% AI-maintained) CLIs:
+
+- `lemans-remote`: scale `lemans run`-s horizontally using Daytona sandboxes; schedule tasks and pull results later
+- `lemans-viewer`: a web UI for browsing trial results (if you still need a pair of human eyes to look at them)
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies, `rake test` to run the tests, and `bin/console` for an interactive prompt.
