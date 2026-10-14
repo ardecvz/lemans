@@ -22,6 +22,11 @@
 #     exe/lemans-remote run --bench ../ai-evals --task hello-world
 #     exe/lemans-remote run --bench ../ai-evals --model openrouter/z-ai/glm-5.2 --model openrouter/qwen/qwen3.5-coder --args="-k 2 -c 8"
 #
+#   Ship agent/backend plugins with -r FILE (run and restart): each file is
+#   uploaded and passed to the remote lemans as --require:
+#
+#     exe/lemans-remote run --bench ../ai-evals -r ./claude-code.rb --args="--agent claude-code" --env CLAUDE_CODE_OAUTH_TOKEN
+#
 #   Retry invalid local results (agent/infra errors, not negative rewards):
 #   launches one sandbox per invalid (task, model) group — a single retried
 #   attempt per task — and moves that result dir into runs/_trash; call again
@@ -94,12 +99,17 @@ module LemansRemote # :nodoc: all
   REMOTE_WRAPPER = "/tmp/lemans-remote-wrapper.sh"
   REMOTE_HOOKS = "/tmp/lemans-remote-hooks.rb"
   REMOTE_META = "/tmp/lemans-remote-run.json"
+  REMOTE_REQUIRES_DIR = "/tmp/lemans-remote-requires"
 
   ENV_ALLOWLIST = %w[OPENROUTER_API_KEY LEMANS_PROVIDER_ORDER OPENROUTER_PROVIDER_ORDER].freeze
 
   Backend = Lemans::Environments::Daytona
 
   def self.client = Backend.client
+
+  def self.remote_require(path) = "#{REMOTE_REQUIRES_DIR}/#{File.basename(path)}"
+
+  def self.require_args(paths) = paths.flat_map { [ "--require", remote_require(it) ] }
 
   class Provisioner
     include Backend::Retries
@@ -558,7 +568,7 @@ module LemansRemote # :nodoc: all
     # are run dirs (relative to `runs_dir`) shipped into the sandbox's runs/
     # for the command to read, and dropped again before the results leave it.
     def initialize(bench:, snapshot:, run_id:, tasks:, models:, extra_args:, extra_env:,
-                   timeout_sec:, runs_dir:, keep:, sync:, shell:, launch_interval: 0, command: nil, sources: [])
+                   timeout_sec:, runs_dir:, keep:, sync:, shell:, launch_interval: 0, command: nil, sources: [], requires: [])
       @bench = bench
       @snapshot = snapshot
       @run_id = run_id
@@ -574,6 +584,7 @@ module LemansRemote # :nodoc: all
       @launch_interval = launch_interval
       @command = command
       @sources = sources
+      @requires = requires
       @started_at = Time.now.utc.iso8601
     end
 
@@ -680,6 +691,13 @@ module LemansRemote # :nodoc: all
                      "tar -xzf #{REMOTE_BENCH_ARCHIVE} -C #{REMOTE_BENCH_DIR} && " \
                      "rm -f #{REMOTE_BENCH_ARCHIVE}")
       upload_sources(sandbox) if @sources.any?
+      upload_requires(sandbox) if @requires.any?
+    end
+
+    def upload_requires(sandbox)
+      say :upload, @requires.join(", ")
+      exec!(sandbox, "mkdir -p #{REMOTE_REQUIRES_DIR}")
+      @requires.each { upload_blob(sandbox, File.read(it), LemansRemote.remote_require(it)) }
     end
 
     def upload_sources(sandbox)
@@ -723,7 +741,7 @@ module LemansRemote # :nodoc: all
     def remote_command
       return @command if @command
 
-      command = %w[lemans run --bench .]
+      command = %w[lemans run --bench .] + LemansRemote.require_args(@requires)
       @tasks.each { command += [ "--task", it ] }
       @models.each { command += [ "--model", it ] }
       command = command.shelljoin
@@ -941,6 +959,8 @@ module LemansRemote # :nodoc: all
     option :retry_runs, desc: "Retry invalid results from this local runs directory " \
                               "(one attempt per task per call, retried results move to _trash)"
     option :args, default: "", desc: "Extra `lemans run` options, passed through verbatim"
+    option :require, aliases: "-r", banner: "FILE", repeatable: true,
+                     desc: "Load a Ruby file (an agent or backend plugin) here and in the sandbox's lemans"
     option :timeout, default: "6h", desc: "Give up on the remote run after this long"
     option :sync, type: :boolean, default: false, desc: "Wait for the run and download the results directly"
     option :run_in_band, type: :boolean, default: false, aliases: %w[--runInBand],
@@ -954,6 +974,7 @@ module LemansRemote # :nodoc: all
     option :launch_interval, type: :numeric, default: 3,
                              desc: "Async mode: seconds between consecutive launches (0 to disable)"
     def run_bench
+      load_requires!
       bench = Lemans::Config.load_file(options[:bench])
 
       planner = RetryPlanner.new(options[:retry_runs]) if options[:retry_runs]
@@ -1025,6 +1046,8 @@ module LemansRemote # :nodoc: all
                       desc: "Grade the last verified step again (with the current tests) and go on from there"
     option :allow_scored, type: :boolean, default: false, desc: "Restart a scored run (--reverify always may)"
     option :max_output_tokens, type: :numeric, banner: "TOKENS", desc: "Cap the agent's output per model call"
+    option :require, aliases: "-r", banner: "FILE", repeatable: true,
+                     desc: "Load a Ruby file (an agent or backend plugin) here and in the sandbox's lemans"
     option :concurrency, type: :numeric, aliases: "-c", desc: "Restarts in flight at once inside a sandbox (with --run-in-band)"
     option :timeout, default: "6h", desc: "Give up on the remote run after this long"
     option :sync, type: :boolean, default: false, desc: "Restart every run in one sandbox, wait, and download the results"
@@ -1039,6 +1062,7 @@ module LemansRemote # :nodoc: all
       raise Thor::Error, "lemans-remote: --recover and --reverify exclude each other" if options[:recover] && options[:reverify]
       raise Thor::Error, "lemans-remote: --launch-interval must not be negative" if options[:launch_interval].to_f.negative?
 
+      load_requires!
       bench = Lemans::Config.load_file(options[:bench])
       runs_root = Pathname(options[:runs_dir])
       store = Lemans::Stores::FS.new(runs_root)
@@ -1361,7 +1385,8 @@ module LemansRemote # :nodoc: all
         keep: options[:keep],
         sync: options[:sync],
         shell: shell,
-        launch_interval: options[:launch_interval].to_f
+        launch_interval: options[:launch_interval].to_f,
+        requires:
       ).call
     end
 
@@ -1407,12 +1432,25 @@ module LemansRemote # :nodoc: all
         shell: shell,
         launch_interval: options[:launch_interval].to_f,
         command: restart_command(sources),
-        sources: sources.map { |source| runs_root.glob("**/#{source.id}").find(&:directory?).relative_path_from(runs_root).to_s }
+        sources: sources.map { |source| runs_root.glob("**/#{source.id}").find(&:directory?).relative_path_from(runs_root).to_s },
+        requires:
       ).call
     end
 
+    def requires = (options[:require] || []).map { File.expand_path(it) }
+
+    # The remote copies share one directory, by file name
+    def load_requires!
+      clashes = requires.group_by { File.basename(it) }.select { |_, paths| paths.uniq.size > 1 }.keys
+      raise Thor::Error, "lemans-remote: --require files must have distinct names (#{clashes.join(", ")})" if clashes.any?
+
+      requires.each { require it }
+    rescue LoadError => e
+      raise Thor::Error, "lemans-remote: #{e.message}"
+    end
+
     def restart_command(sources)
-      argv = [ "lemans", "restart", *sources.map(&:id), "--bench", ".", "--runs-dir", "runs" ]
+      argv = [ "lemans", "restart", *sources.map(&:id), "--bench", ".", "--runs-dir", "runs", *LemansRemote.require_args(requires) ]
       argv << "--recover" if options[:recover]
       argv << "--reverify" if options[:reverify]
       argv << "--allow-scored" if options[:allow_scored]
