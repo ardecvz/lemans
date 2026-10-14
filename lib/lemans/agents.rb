@@ -14,15 +14,11 @@ module Lemans
     @registered = {}
 
     class << self
-      def register(name, agent_class)
-        raise ConfigError, "agent #{name.inspect} is built in" if REGISTRY.key?(name)
-
-        @registered[name] = agent_class
-      end
+      def register(name, agent_class) = @registered[name] = agent_class
 
       def unregister(name) = @registered.delete(name)
 
-      def names = REGISTRY.keys + @registered.keys
+      def names = REGISTRY.keys | @registered.keys
 
       def build(name, profile:, model: nil) = lookup(name).new(profile: profile, model: model)
 

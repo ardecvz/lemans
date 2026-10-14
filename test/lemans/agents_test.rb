@@ -11,6 +11,7 @@ class AgentsTest < Minitest::Test
 
   def teardown
     Lemans::Agents.unregister(TestAgent::NAME)
+    Lemans::Agents.unregister("oracle")
   end
 
   def test_register
@@ -25,10 +26,16 @@ class AgentsTest < Minitest::Test
     assert_instance_of Lemans::Agents::Oracle, Lemans::Agents.build("oracle", profile: config)
   end
 
-  def test_builtin_names_are_taken
-    error = assert_raises(Lemans::ConfigError) { Lemans::Agents.register("oracle", TestAgent) }
+  def test_override_builtin
+    config = Lemans::Config::Agent.new("oracle", "some/model")
+    Lemans::Agents.register("oracle", TestAgent)
 
-    assert_equal "agent \"oracle\" is built in", error.message
+    assert_instance_of TestAgent, Lemans::Agents.build("oracle", profile: config)
+    assert_equal 1, Lemans::Agents.names.count("oracle")
+
+    Lemans::Agents.unregister("oracle")
+
+    assert_instance_of Lemans::Agents::Oracle, Lemans::Agents.build("oracle", profile: config)
   end
 
   def test_unknown_agent

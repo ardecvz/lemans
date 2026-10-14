@@ -6,11 +6,21 @@ module Lemans
   module Environments
     BACKENDS = { "daytona" => "Daytona", "docker" => "Docker" }.freeze
 
-    def self.build(backend, **)
-      constant = BACKENDS[backend.to_s] or
-        raise ConfigError, "unknown backend #{backend.inspect} (known: #{BACKENDS.keys.join(", ")})"
+    @registered = {}
 
-      const_get(constant).new(**)
+    class << self
+      def register(name, environment_class) = @registered[name] = environment_class
+
+      def unregister(name) = @registered.delete(name)
+
+      def names = BACKENDS.keys | @registered.keys
+
+      def build(backend, **) = lookup(backend.to_s).new(**)
+
+      def lookup(name)
+        @registered[name] || (BACKENDS[name] && const_get(BACKENDS[name])) or
+          raise ConfigError, "unknown backend #{name.inspect} (known: #{names.join(", ")})"
+      end
     end
   end
 end

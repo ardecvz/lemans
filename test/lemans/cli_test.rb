@@ -6,6 +6,7 @@ require "lemans/cli"
 class CLITest < Minitest::Test
   def teardown
     Lemans::Agents.unregister("required-agent")
+    Lemans::Environments.unregister("required-backend")
   end
 
   def test_require
@@ -28,6 +29,46 @@ class CLITest < Minitest::Test
 
       assert_includes Lemans::Agents.names, "required-agent"
       assert_includes err, "no matching tasks"
+    end
+  end
+
+  def test_require_before_the_command
+    Dir.mktmpdir do |dir|
+      agent = File.join(dir, "required_agent.rb")
+      File.write(agent, <<~RUBY)
+        class RequiredAgent < Lemans::Agent; end
+        Lemans::Agents.register("required-agent", RequiredAgent)
+      RUBY
+      backend = File.join(dir, "required_backend.rb")
+      File.write(backend, <<~RUBY)
+        class RequiredBackend < Lemans::Environment; end
+        Lemans::Environments.register("required-backend", RequiredBackend)
+      RUBY
+
+      _, err = capture_io do
+        Miniswen.stub(:refresh_registry!, nil) do
+          assert_raises(SystemExit) do
+            Lemans::CLI.start([ "-r", agent, "--require=#{backend}", "run", "--bench", BenchFixture::ROOT.to_s,
+                                "--backend", "required-backend", "--task", "none" ])
+          end
+        end
+      end
+
+      assert_includes Lemans::Agents.names, "required-agent"
+      assert_includes Lemans::Environments.names, "required-backend"
+      assert_includes err, "no matching tasks"
+    end
+  end
+
+  def test_require_for_any_command
+    Dir.mktmpdir do |dir|
+      plugin = File.join(dir, "required_plugin.rb")
+      File.write(plugin, "Lemans::Environments.register(\"required-backend\", Class.new(Lemans::Environment))\n")
+
+      _, err = capture_io { assert_raises(SystemExit) { Lemans::CLI.start([ "report", dir, "-r", plugin ]) } }
+
+      assert_includes Lemans::Environments.names, "required-backend"
+      assert_includes err, "no matching results"
     end
   end
 end
