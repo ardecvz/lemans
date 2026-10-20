@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Daytona: don't hang until the timeout on unclosed heredocs or quotes.
+
 ## [1.5.2] - 2026-10-14
 
 - `lemans --require/-r [command]`: load agent, backend plugins (`lemans -r plugin.rb restart RUN`)
