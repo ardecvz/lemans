@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 - Daytona: don't hang until the timeout on unclosed heredocs or quotes.
+- Miniswen: run commands in the task's `workdir`, not the image's `WORKDIR`.
 
 ## [1.5.2] - 2026-10-14
 
