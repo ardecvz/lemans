@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Trials keep their git state outside the app dir, so the agent's `.git` can't affect results.
+
 ## [1.5.2] - 2026-10-14
 
 - `lemans --require/-r [command]`: load agent, backend plugins (`lemans -r plugin.rb restart RUN`)
